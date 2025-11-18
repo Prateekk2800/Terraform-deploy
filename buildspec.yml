@@ -3,36 +3,40 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing zip utility"
+      - echo "Installing system dependencies"
       - apt-get update -y || true
-      - apt-get install zip -y || true
+      - apt-get install -y zip unzip || true
 
   pre_build:
     commands:
       - echo "Zipping website files"
-      - zip -r website.zip ./*
+      - zip -r website.zip ./web
 
   build:
     commands:
-      - echo "Encoding zip to base64"
+      - echo "Encoding ZIP to Base64"
       - ZIP_BASE64=$(base64 -w 0 website.zip)
 
   post_build:
     commands:
-      - echo "Deploying using SSM"
-      # TODO: Replace with Terraform output later
+      - echo "Starting Website Deployment via SSM"
+      
+      # Your EC2 Instance ID (from Terraform output)
       - INSTANCE_ID="i-1234567890abcdef"
+
       - |
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy Website" \
           --parameters '{"commands": [
-            "echo '"$ZIP_BASE64"' | base64 -d > /tmp/website.zip",
             "sudo apt-get update -y",
-            "sudo apt-get install unzip -y",
-            "sudo rm -rf /var/www/html/*",
-            "sudo unzip /tmp/website.zip -d /var/www/html/"
+            "sudo apt-get install -y apache2",
+            "sudo systemctl enable apache2",
+            "sudo systemctl start apache2",
+            "echo '"$ZIP_BASE64"' | base64 -d > /tmp/website.zip",
+            "sudo unzip -o /tmp/website.zip -d /var/www/html/",
+            "sudo chmod -R 755 /var/www/html"
           ]}' \
           --region ap-south-1
 

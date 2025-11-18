@@ -7,21 +7,29 @@ terraform {
   }
 }
 
-# Configure the AWS Provider
 provider "aws" {
   region = "ap-south-1"
 }
 
-resource "aws_instance" "example" {
-  ami                    = "ami-03695d52f0d883f65"
-  instance_type          = "t3.micro"
-  key_name               = "LinuxKP"
-  iam_instance_profile   = "EC2-SSM-Role"
-  tags = {
-    Name = "TerraServer"
+# Use latest Ubuntu 22.04 AMI
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 }
 
-output "instance_id" {
-  value = aws_instance.example.id
+resource "aws_instance" "web" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = "t3.micro"
+  key_name               = "LinuxKP"
+
+  iam_instance_profile   = "EC2-SSM-Role"
+
+  tags = {
+    Name = "Ubuntu-SSM-Server"
+  }
 }

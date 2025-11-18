@@ -3,43 +3,34 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing Terraform"
-      - wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
-      - unzip terraform_1.6.0_linux_amd64.zip
-      - mv terraform /usr/local/bin/
-      - yum install -y jq
+      - echo "Installing tools"
+      - sudo apt-get update || true
       - pip install awscli
 
   build:
     commands:
-      - echo "=== Terraform Apply ==="
-      - cd Terraform
-      - terraform init
-      - terraform apply -auto-approve
-      - INSTANCE_ID=$(terraform output -raw instance_id)
-      - cd ..
+      - echo "Creating zip file..."
+      - zip -r website.zip .
 
-      - echo "=== Install nginx on EC2 using SSM ==="
-      - |
-        aws ssm send-command \
+      - echo "Encoding zip to base64"
+      - ZIP_BASE64=$(base64 website.zip)
+
+  post_build:
+    commands:
+      - echo "Deploying using SSM"
+
+      - INSTANCE_ID="i-1234567890abcdef"
+
+      - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --comment "Install nginx" \
-          --parameters '{"commands":["sudo yum install -y nginx","sudo systemctl enable nginx","sudo systemctl start nginx"]}' \
-          --region ap-south-1
-
-      - echo "=== Prepare HTML content ==="
-      - HTML_CONTENT=$(sed 's/"/\\"/g' web/index.html | sed ':a;N;$!ba;s/\n/\\n/g')
-
-      - echo "=== Upload HTML to EC2 ==="
-      - |
-        aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --comment "Upload HTML content" \
-          --parameters "{\"commands\":[\"echo -e \\\"$HTML_CONTENT\\\" | sudo tee /usr/share/nginx/html/index.html\"]}" \
-          --region ap-south-1
-
+          --parameters commands="[
+              \"echo $ZIP_BASE64 | base64 -d > /tmp/website.zip\",
+              \"sudo apt-get update -y\",
+              \"sudo apt-get install unzip -y\",
+              \"sudo rm -rf /var/www/html/*\",
+              \"sudo unzip /tmp/website.zip -d /var/www/html/\"
+          ]"
 artifacts:
   files:
-    - '**/*'
+    - website.zip

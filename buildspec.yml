@@ -3,30 +3,38 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing dependencies"
+      - echo "Installing Terraform"
+      - wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
+      - unzip terraform_1.6.0_linux_amd64.zip
+      - mv terraform /usr/local/bin/
+      - terraform -version
       - yum install -y zip jq
       - pip install awscli
 
   build:
     commands:
+      - echo "=== Terraform Apply ==="
+      - cd Terraform
+      - terraform init
+      - terraform apply -auto-approve
+      - INSTANCE_ID=$(terraform output -raw instance_id)
+      - cd ..
+
       - echo "Zipping website folder"
       - zip -r website.zip web/*
 
   post_build:
     commands:
-      - echo "Getting EC2 Instance ID from Terraform output"
-      - cd Terraform
-      - INSTANCE_ID=$(terraform output -raw instance_id)
-      - cd ..
-      - echo "Deploying website to EC2 using SSM"
-      - ZIP_CONTENT=$(base64 website.zip | tr -d '\n')
+      - echo "Deploying website to EC2 via SSM"
       - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy Website" \
-          --parameters '{"commands":["echo '$ZIP_CONTENT' | base64 -d > /tmp/website.zip","sudo yum install -y unzip","sudo rm -rf /usr/share/nginx/html/*","sudo unzip /tmp/website.zip -d /usr/share/nginx/html/","sudo systemctl restart nginx"]}' \
+          --parameters '{"commands": [
+            "echo $(base64 website.zip) | base64 -d > /tmp/website.zip",
+            "sudo apt-get update -y",
+            "sudo apt-get install unzip -y",
+            "sudo rm -rf /var/www/html/*",
+            "sudo unzip /tmp/website.zip -d /var/www/html/"
+          ]}' \
           --region ap-south-1
-
-artifacts:
-  files:
-    - website.zip

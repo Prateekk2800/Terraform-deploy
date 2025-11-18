@@ -19,22 +19,26 @@ phases:
       - INSTANCE_ID=$(terraform output -raw instance_id)
       - cd ..
 
-      - echo "=== Install nginx on EC2 ==="
+      - echo "=== Install nginx on EC2 using SSM ==="
       - |
-      - aws ssm send-command \
+        aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Install nginx" \
-          --parameters 'commands=["sudo yum install -y nginx","sudo systemctl enable nginx","sudo systemctl start nginx"]'
+          --parameters commands='["sudo yum install -y nginx","sudo systemctl enable nginx","sudo systemctl start nginx"]' \
+          --region ap-south-1
 
-      - echo "=== Sending HTML content to EC2 ==="
+      - echo "=== Prepare HTML content ==="
       - HTML_CONTENT=$(sed 's/"/\\"/g' web/index.html | sed ':a;N;$!ba;s/\n/\\n/g')
 
-      - aws ssm send-command \
+      - echo "=== Upload HTML to EC2 ==="
+      - |
+        aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy HTML" \
-          --parameters commands=["echo \"$HTML_CONTENT\" | sudo tee /usr/share/nginx/html/index.html"]
+          --parameters commands='["echo \"$HTML_CONTENT\" | sudo tee /usr/share/nginx/html/index.html"]' \
+          --region ap-south-1
 
 artifacts:
   files:

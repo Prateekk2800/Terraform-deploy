@@ -1,0 +1,40 @@
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "Installing Terraform"
+      - wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
+      - unzip terraform_1.6.0_linux_amd64.zip
+      - mv terraform /usr/local/bin/
+      - yum install -y jq
+      - pip install awscli
+
+  build:
+    commands:
+      - echo "=== Terraform Apply ==="
+      - cd terraform
+      - terraform init
+      - terraform apply -auto-approve
+      - INSTANCE_ID=$(terraform output -raw instance_id)
+      - cd ..
+
+      - echo "=== Install nginx on EC2 ==="
+      - aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --comment "Install nginx" \
+          --parameters 'commands=["sudo yum install -y nginx","sudo systemctl enable nginx","sudo systemctl start nginx"]'
+
+      - echo "=== Sending HTML content to EC2 ==="
+      - HTML_CONTENT=$(sed 's/"/\\"/g' web/index.html | sed ':a;N;$!ba;s/\n/\\n/g')
+
+      - aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --comment "Deploy HTML" \
+          --parameters commands=["echo \"$HTML_CONTENT\" | sudo tee /usr/share/nginx/html/index.html"]
+
+artifacts:
+  files:
+    - '**/*'

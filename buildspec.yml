@@ -5,7 +5,9 @@ phases:
     runtime-versions:
       python: 3.9
     commands:
-      - echo "Installing AWS CLI v2"
+      - echo "Installing unzip and AWS CLI v2"
+      - apt-get update -y || yum update -y || true
+      - apt-get install -y unzip curl || yum install -y unzip curl || true
       - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
       - unzip awscliv2.zip
       - sudo ./aws/install --update
@@ -15,6 +17,11 @@ phases:
     commands:
       - echo "Zipping website folder"
       - zip -r website.zip web/*
+      - echo "Initializing Terraform"
+      - cd Terraform
+      - terraform init
+      - terraform apply -auto-approve
+      - cd ..
 
   build:
     commands:
@@ -24,19 +31,9 @@ phases:
     commands:
       - echo "Getting EC2 Instance ID using AWS CLI"
       - INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=TerraWebServer" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].InstanceId" --output text)
+      - echo "EC2 Instance ID: $INSTANCE_ID"
       - echo "Deploying index.html to EC2 via SSM"
-      - aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --comment "Deploy HTML" \
-          --parameters commands='[
-            "sudo apt-get update -y",
-            "sudo apt-get install -y nginx",
-            "sudo systemctl enable nginx",
-            "sudo systemctl start nginx",
-            "sudo cp web/index.html /var/www/html/index.html"
-          ]' \
-          --region ap-south-1
+      - aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name "AWS-RunShellScript" --comment "Deploy HTML" --parameters '{"commands":["sudo apt-get update -y","sudo apt-get install -y nginx","sudo systemctl enable nginx","sudo systemctl start nginx","sudo cp web/index.html /var/www/html/index.html"]}' --region ap-south-1
 
 artifacts:
   files:

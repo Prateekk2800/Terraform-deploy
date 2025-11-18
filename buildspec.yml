@@ -3,40 +3,41 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing system dependencies"
-      - apt-get update -y || true
-      - apt-get install -y zip unzip || true
+      - echo "Installing zip..."
+      - apt-get update -y
+      - apt-get install -y zip
 
   pre_build:
     commands:
-      - echo "Zipping website files"
-      - zip -r website.zip ./web
+      - echo "Creating zip archive..."
+      - zip -r website.zip .
 
   build:
     commands:
-      - echo "Encoding ZIP to Base64"
-      - ZIP_BASE64=$(base64 -w 0 website.zip)
+      - echo "Encoding zip to Base64..."
+      - ZIP_BASE64=$(base64 website.zip)
+
+      - echo "Detecting EC2 instance with tag Name=MyServer..."
+      - INSTANCE_ID=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=MyServer" "Name=instance-state-name,Values=running" \
+          --query "Reservations[0].Instances[0].InstanceId" \
+          --output text)
+
+      - echo "Deploying to instance: $INSTANCE_ID"
 
   post_build:
     commands:
-      - echo "Starting Website Deployment via SSM"
-      
-      # Your EC2 Instance ID (from Terraform output)
-      - INSTANCE_ID="i-1234567890abcdef"
-
-      - |
-        aws ssm send-command \
+      - echo "Sending deployment via SSM..."
+      - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy Website" \
           --parameters '{"commands": [
-            "sudo apt-get update -y",
-            "sudo apt-get install -y apache2",
-            "sudo systemctl enable apache2",
-            "sudo systemctl start apache2",
-            "echo '"$ZIP_BASE64"' | base64 -d > /tmp/website.zip",
-            "sudo unzip -o /tmp/website.zip -d /var/www/html/",
-            "sudo chmod -R 755 /var/www/html"
+              "echo '"$ZIP_BASE64"' | base64 -d > /tmp/website.zip",
+              "sudo apt-get update -y",
+              "sudo apt-get install unzip -y",
+              "sudo rm -rf /var/www/html/*",
+              "sudo unzip /tmp/website.zip -d /var/www/html/"
           ]}' \
           --region ap-south-1
 

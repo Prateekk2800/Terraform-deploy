@@ -1,10 +1,22 @@
 version: 0.2
 
+env:
+  variables:
+    TF_VERSION: "1.6.0"   # Terraform version
+    AWS_REGION: "ap-south-1"
+    WEB_FOLDER: "web"
+    INSTANCE_TAG_NAME: "TerraWebServer"
+
 phases:
   install:
     runtime-versions:
       python: 3.9
     commands:
+      - echo "Installing Terraform"
+      - curl -LO https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip
+      - unzip terraform_${TF_VERSION}_linux_amd64.zip
+      - sudo mv terraform /usr/local/bin/
+      - terraform -version
       - echo "Installing AWS CLI v2"
       - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
       - unzip awscliv2.zip
@@ -14,11 +26,17 @@ phases:
   pre_build:
     commands:
       - echo "Zipping website folder"
-      - zip -r website.zip web/*
+      - zip -r website.zip ${WEB_FOLDER}/*
       - echo "Initializing Terraform"
       - cd Terraform
       - terraform init
       - terraform apply -auto-approve
+      - echo "Fetching EC2 Instance ID"
+      - INSTANCE_ID=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=${INSTANCE_TAG_NAME}" "Name=instance-state-name,Values=running" \
+          --query "Reservations[0].Instances[0].InstanceId" \
+          --output text)
+      - echo "EC2 Instance ID: $INSTANCE_ID"
       - cd ..
 
   build:
@@ -27,18 +45,19 @@ phases:
 
   post_build:
     commands:
-      - echo "Getting EC2 Instance ID and deploying index.html via SSM" 
-      - |-
-        INSTANCE_ID=$(aws ec2 describe-instances \
-          --filters "Name=tag:Name,Values=TerraWebServer" "Name=instance-state-name,Values=running" \
-          --query "Reservations[0].Instances[0].InstanceId" --output text)
-      - |-
-        aws ssm send-command \
+      - echo "Deploying index.html to EC2 via SSM"
+      - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy HTML" \
-          --parameters "{\"commands\":[\"sudo apt-get update -y\",\"sudo apt-get install -y nginx\",\"sudo systemctl enable nginx\",\"sudo systemctl start nginx\",\"sudo cp web/index.html /var/www/html/index.html\"]}" \
-          --region ap-south-1
+          --parameters commands='[
+            "sudo apt-get update -y",
+            "sudo apt-get install -y nginx",
+            "sudo systemctl enable nginx",
+            "sudo systemctl start nginx",
+            "sudo cp web/index.html /var/www/html/index.html"
+          ]' \
+          --region $AWS_REGION
 
 artifacts:
   files:

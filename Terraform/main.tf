@@ -22,7 +22,7 @@ data "aws_vpc" "default" {
 }
 
 # Security Group
-resource "aws_security_group" "web_sg" {
+resource "aws_security_group" "web_sg1" {
   name        = "web-sg"
   description = "Allow HTTP and SSH"
   vpc_id      = data.aws_vpc.default.id
@@ -55,7 +55,7 @@ resource "aws_instance" "web" {
   instance_type          = "t3.micro"
   key_name               = "LinuxKP"               # Your keypair
   iam_instance_profile   = data.aws_iam_instance_profile.ssm_profile.name
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
+  vpc_security_group_ids = [aws_security_group.web_sg1.id]
 
   tags = {
     Name = "TerraServer"

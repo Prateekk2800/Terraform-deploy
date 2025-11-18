@@ -30,17 +30,12 @@ phases:
   post_build:
     commands:
       - echo "Deploying index.html to EC2 via SSM"
-      - aws ssm send-command \
+      - |
+        aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy HTML" \
-          --parameters 'commands=[
-            "sudo apt-get update -y",
-            "sudo apt-get install -y nginx",
-            "sudo systemctl enable nginx",
-            "sudo systemctl start nginx",
-            "sudo cp web/index.html /var/www/html/index.html"
-          ]' \
+          --parameters commands="sudo apt-get update -y; sudo apt-get install -y nginx; sudo systemctl enable nginx; sudo systemctl start nginx; sudo cp web/index.html /var/www/html/index.html" \
           --region ap-south-1
 
 artifacts:

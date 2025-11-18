@@ -20,6 +20,7 @@ phases:
       - cd ..
 
       - echo "=== Install nginx on EC2 ==="
+      - |
       - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \

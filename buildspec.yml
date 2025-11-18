@@ -2,43 +2,48 @@ version: 0.2
 
 phases:
   install:
+    runtime-versions:
+      python: 3.9
     commands:
-      - echo "Installing Terraform..."
-      - yum install -y unzip zip jq
-      - wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
-      - unzip terraform_1.6.0_linux_amd64.zip
-      - mv terraform /usr/local/bin/
+      - echo "Installing AWS CLI v2"
+      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      - unzip awscliv2.zip
+      - sudo ./aws/install --update
+      - echo "Install phase complete"
 
   pre_build:
     commands:
-      - echo "Running Terraform apply..."
+      - echo "Zipping website folder"
+      - zip -r website.zip web/*
+      - echo "Terraform init & apply"
       - cd Terraform
       - terraform init
       - terraform apply -auto-approve
       - INSTANCE_ID=$(terraform output -raw instance_id)
+      - echo "EC2 Instance ID: $INSTANCE_ID"
       - cd ..
 
   build:
     commands:
-      - echo "Preparing HTML content..."
-      - HTML_CONTENT=$(<web/index.html)
+      - echo "Build phase complete"
 
   post_build:
     commands:
-      - echo "Deploying HTML to EC2 via SSM..."
-      - |
-        aws ssm send-command \
+      - echo "Deploying website to EC2 via SSM"
+      - HTML_CONTENT=$(base64 web/index.html)
+      - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy HTML" \
-          --parameters 'commands=[
-            "sudo yum install -y nginx",
-            "sudo systemctl enable nginx",
-            "sudo systemctl start nginx",
-            "echo '"$HTML_CONTENT"' | sudo tee /usr/share/nginx/html/index.html"
-          ]' \
+          --parameters commands="[
+            \"sudo apt-get update -y\",
+            \"sudo apt-get install -y nginx\",
+            \"sudo systemctl enable nginx\",
+            \"sudo systemctl start nginx\",
+            \"echo '$HTML_CONTENT' | base64 -d | sudo tee /var/www/html/index.html\"
+          ]" \
           --region ap-south-1
 
 artifacts:
   files:
-    - '**/*'
+    - website.zip

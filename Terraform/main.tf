@@ -18,7 +18,7 @@ data "aws_iam_role" "ssm_role" {
 
 # Create an EC2 instance
 resource "aws_instance" "web" {
-  ami                    = "ami-09e67e426f25ce0d7" # Ubuntu 22.04 LTS for ap-south-1
+  ami                    = "ami-03695d52f0d883f65" # Ubuntu 22.04 LTS for ap-south-1
   instance_type          = "t3.micro"
   key_name               = "LinuxKP"              # Your existing key pair
   vpc_security_group_ids = ["sg-02bc82cc403b4f622"]

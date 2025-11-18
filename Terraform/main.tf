@@ -11,58 +11,25 @@ provider "aws" {
   region = "ap-south-1"
 }
 
-# Use existing IAM Instance Profile
-data "aws_iam_instance_profile" "ssm_profile" {
-  name = "EC2-SSM-Role"  # your existing role name
+# Use existing IAM Role (imported)
+data "aws_iam_role" "ssm_role" {
+  name = "EC2-SSM-Role"
 }
 
-# Default VPC data
-data "aws_vpc" "default" {
-  default = true
-}
-
-# Security Group
-resource "aws_security_group" "web_sg_1" {
-  name        = "web-sg"
-  description = "Allow HTTP and SSH"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-# EC2 Instance
+# Create an EC2 instance
 resource "aws_instance" "web" {
-  ami                    = "ami-03695d52f0d883f65" # Ubuntu 22.04 or Amazon Linux
+  ami                    = "ami-09e67e426f25ce0d7" # Ubuntu 22.04 LTS for ap-south-1
   instance_type          = "t3.micro"
-  key_name               = "LinuxKP"               # Your keypair
-  iam_instance_profile   = data.aws_iam_instance_profile.ssm_profile.name
-  vpc_security_group_ids = [aws_security_group.web_sg_1.id]
+  key_name               = "LinuxKP"              # Your existing key pair
+  vpc_security_group_ids = ["sg-02bc82cc403b4f622"]
+  iam_instance_profile   = data.aws_iam_role.ssm_role.name
 
   tags = {
-    Name = "TerraServer"
+    Name = "TerraWebServer"
   }
 }
 
-# Outputs
+# Output EC2 instance info
 output "instance_id" {
   value = aws_instance.web.id
 }

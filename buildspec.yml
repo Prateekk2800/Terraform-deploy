@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   variables:
-    TF_VERSION: "1.6.0"   # Terraform version
+    TF_VERSION: "1.6.0"
     AWS_REGION: "ap-south-1"
     WEB_FOLDER: "web"
     INSTANCE_TAG_NAME: "TerraWebServer"
@@ -32,10 +32,7 @@ phases:
       - terraform init
       - terraform apply -auto-approve
       - echo "Fetching EC2 Instance ID"
-      - INSTANCE_ID=$(aws ec2 describe-instances \
-          --filters "Name=tag:Name,Values=${INSTANCE_TAG_NAME}" "Name=instance-state-name,Values=running" \
-          --query "Reservations[0].Instances[0].InstanceId" \
-          --output text)
+      - INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${INSTANCE_TAG_NAME}" "Name=instance-state-name,Values=running" --query "Reservations[0].Instances[0].InstanceId" --output text)
       - echo "EC2 Instance ID: $INSTANCE_ID"
       - cd ..
 
@@ -46,17 +43,12 @@ phases:
   post_build:
     commands:
       - echo "Deploying index.html to EC2 via SSM"
-      - aws ssm send-command \
+      - |
+        aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy HTML" \
-          --parameters commands='[
-            "sudo apt-get update -y",
-            "sudo apt-get install -y nginx",
-            "sudo systemctl enable nginx",
-            "sudo systemctl start nginx",
-            "sudo cp web/index.html /var/www/html/index.html"
-          ]' \
+          --parameters commands='["sudo apt-get update -y","sudo apt-get install -y nginx","sudo systemctl enable nginx","sudo systemctl start nginx","sudo cp web/index.html /var/www/html/index.html"]' \
           --region $AWS_REGION
 
 artifacts:

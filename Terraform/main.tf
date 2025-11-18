@@ -12,8 +12,8 @@ provider "aws" {
 }
 
 resource "aws_instance" "web" {
-  ami           = "ami-0f5ee92e2d63afc18" # Amazon Linux 2
-  instance_type = "t2.micro"
+  ami           = "ami-05d53127e5aff7daf" # Amazon Linux 2
+  instance_type = "t3.micro"
 
   user_data = <<-EOF
     #!/bin/bash

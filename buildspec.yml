@@ -25,7 +25,7 @@ phases:
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Install nginx" \
-          --parameters commands='["sudo yum install -y nginx","sudo systemctl enable nginx","sudo systemctl start nginx"]' \
+          --parameters '{"commands":["sudo yum install -y nginx","sudo systemctl enable nginx","sudo systemctl start nginx"]}' \
           --region ap-south-1
 
       - echo "=== Prepare HTML content ==="
@@ -36,8 +36,8 @@ phases:
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --comment "Deploy HTML" \
-          --parameters commands='["echo \"$HTML_CONTENT\" | sudo tee /usr/share/nginx/html/index.html"]' \
+          --comment "Upload HTML content" \
+          --parameters "{\"commands\":[\"echo -e \\\"$HTML_CONTENT\\\" | sudo tee /usr/share/nginx/html/index.html\"]}" \
           --region ap-south-1
 
 artifacts:

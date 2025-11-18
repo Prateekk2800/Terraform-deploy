@@ -15,11 +15,11 @@ phases:
     commands:
       - echo "Zipping website folder"
       - zip -r website.zip web/*
-      - echo "Terraform init & apply"
+      - echo "Initializing Terraform"
       - cd Terraform
       - terraform init
       - terraform apply -auto-approve
-      - INSTANCE_ID=$(terraform output -raw instance_id)
+      - export INSTANCE_ID=$(terraform output -raw instance_id)
       - echo "EC2 Instance ID: $INSTANCE_ID"
       - cd ..
 
@@ -29,19 +29,18 @@ phases:
 
   post_build:
     commands:
-      - echo "Deploying website to EC2 via SSM"
-      - HTML_CONTENT=$(base64 web/index.html)
+      - echo "Deploying index.html to EC2 via SSM"
       - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy HTML" \
-          --parameters commands="[
-            \"sudo apt-get update -y\",
-            \"sudo apt-get install -y nginx\",
-            \"sudo systemctl enable nginx\",
-            \"sudo systemctl start nginx\",
-            \"echo '$HTML_CONTENT' | base64 -d | sudo tee /var/www/html/index.html\"
-          ]" \
+          --parameters 'commands=[
+            "sudo apt-get update -y",
+            "sudo apt-get install -y nginx",
+            "sudo systemctl enable nginx",
+            "sudo systemctl start nginx",
+            "sudo cp web/index.html /var/www/html/index.html"
+          ]' \
           --region ap-south-1
 
 artifacts:

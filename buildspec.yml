@@ -3,17 +3,15 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing tools"
-      - sudo apt-get update || true
+      - echo "Installing AWS CLI"
       - pip install awscli
 
   build:
     commands:
-      - echo "Creating zip file..."
+      - echo "Creating zip"
       - zip -r website.zip .
-
       - echo "Encoding zip to base64"
-      - ZIP_BASE64=$(base64 website.zip)
+      - export ZIP_BASE64=$(base64 website.zip)
 
   post_build:
     commands:
@@ -21,16 +19,19 @@ phases:
 
       - INSTANCE_ID="i-1234567890abcdef"
 
-      - aws ssm send-command \
+      - |
+        aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --parameters commands="[
-              \"echo $ZIP_BASE64 | base64 -d > /tmp/website.zip\",
-              \"sudo apt-get update -y\",
-              \"sudo apt-get install unzip -y\",
-              \"sudo rm -rf /var/www/html/*\",
-              \"sudo unzip /tmp/website.zip -d /var/www/html/\"
+          --comment "Deploy Website" \
+          --parameters "commands=[
+            \"echo $ZIP_BASE64 | base64 -d > /tmp/website.zip\",
+            \"sudo apt-get update -y\",
+            \"sudo apt-get install unzip -y\",
+            \"sudo rm -rf /var/www/html/*\",
+            \"sudo unzip /tmp/website.zip -d /var/www/html/\"
           ]"
+
 artifacts:
   files:
     - website.zip

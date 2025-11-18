@@ -23,7 +23,7 @@ data "aws_security_group" "web_sg" {
 
 # EC2 Instance
 resource "aws_instance" "web" {
-  ami                    = "ami-083654bd07b5da81d"  # Ubuntu 22.04 LTS
+  ami                    = "ami-027308df79a86d22c"  # Ubuntu 22.04 LTS
   instance_type          = "t3.micro"
   iam_instance_profile   = data.aws_iam_role.ssm_role.name
   vpc_security_group_ids = [data.aws_security_group.web_sg.id]

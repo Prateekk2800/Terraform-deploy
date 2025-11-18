@@ -3,34 +3,38 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing AWS CLI"
-      - pip install awscli
+      - echo "Installing zip utility"
+      - apt-get update -y || true
+      - apt-get install zip -y || true
+
+  pre_build:
+    commands:
+      - echo "Zipping website files"
+      - zip -r website.zip ./*
 
   build:
     commands:
-      - echo "Creating zip"
-      - zip -r website.zip .
       - echo "Encoding zip to base64"
-      - export ZIP_BASE64=$(base64 website.zip)
+      - ZIP_BASE64=$(base64 -w 0 website.zip)
 
   post_build:
     commands:
       - echo "Deploying using SSM"
-
+      # TODO: Replace with Terraform output later
       - INSTANCE_ID="i-1234567890abcdef"
-
       - |
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy Website" \
-          --parameters "commands=[
-            \"echo $ZIP_BASE64 | base64 -d > /tmp/website.zip\",
-            \"sudo apt-get update -y\",
-            \"sudo apt-get install unzip -y\",
-            \"sudo rm -rf /var/www/html/*\",
-            \"sudo unzip /tmp/website.zip -d /var/www/html/\"
-          ]"
+          --parameters '{"commands": [
+            "echo '"$ZIP_BASE64"' | base64 -d > /tmp/website.zip",
+            "sudo apt-get update -y",
+            "sudo apt-get install unzip -y",
+            "sudo rm -rf /var/www/html/*",
+            "sudo unzip /tmp/website.zip -d /var/www/html/"
+          ]}' \
+          --region ap-south-1
 
 artifacts:
   files:

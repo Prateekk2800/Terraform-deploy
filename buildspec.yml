@@ -3,44 +3,35 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing zip..."
-      - apt-get update -y
-      - apt-get install -y zip
-
-  pre_build:
-    commands:
-      - echo "Creating zip archive..."
-      - zip -r website.zip .
+      - echo "Installing zip"
+      - apt-get update -y || true
+      - apt-get install zip -y || true
 
   build:
     commands:
-      - echo "Encoding zip to Base64..."
+      - echo "Zipping website..."
+      - zip -r website.zip website/
+
+      - echo "Encoding zip..."
       - ZIP_BASE64=$(base64 website.zip)
-
-      - echo "Detecting EC2 instance with tag Name=MyServer..."
-      - INSTANCE_ID=$(aws ec2 describe-instances \
-          --filters "Name=tag:Name,Values=MyServer" "Name=instance-state-name,Values=running" \
-          --query "Reservations[0].Instances[0].InstanceId" \
-          --output text)
-
-      - echo "Deploying to instance: $INSTANCE_ID"
 
   post_build:
     commands:
-      - echo "Sending deployment via SSM..."
+      - echo "Getting Instance ID from Terraform output"
+      - INSTANCE_ID=$(terraform output -raw instance_id)
+
+      - echo "Deploying website to EC2 via SSM..."
+
       - aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy Website" \
-          --parameters '{"commands": [
-              "echo '"$ZIP_BASE64"' | base64 -d > /tmp/website.zip",
-              "sudo apt-get update -y",
-              "sudo apt-get install unzip -y",
-              "sudo rm -rf /var/www/html/*",
-              "sudo unzip /tmp/website.zip -d /var/www/html/"
-          ]}' \
+          --parameters "commands=[
+            \"echo $ZIP_BASE64 | base64 -d > /tmp/website.zip\",
+            \"sudo apt update -y\",
+            \"sudo apt install unzip nginx -y\",
+            \"sudo rm -rf /var/www/html/*\",
+            \"sudo unzip /tmp/website.zip -d /var/www/html/\",
+            \"sudo systemctl restart nginx\"
+          ]" \
           --region ap-south-1
-
-artifacts:
-  files:
-    - website.zip

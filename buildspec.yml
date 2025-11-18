@@ -3,15 +3,30 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing zip package"
-      - yum install -y zip
+      - echo "Installing dependencies"
+      - yum install -y zip jq
+      - pip install awscli
 
   build:
     commands:
-      - echo "Zipping web folder"
-      - ls -R
-      - zip -r web.zip web/
+      - echo "Zipping website folder"
+      - zip -r website.zip web/*
+
+  post_build:
+    commands:
+      - echo "Getting EC2 Instance ID from Terraform output"
+      - cd Terraform
+      - INSTANCE_ID=$(terraform output -raw instance_id)
+      - cd ..
+      - echo "Deploying website to EC2 using SSM"
+      - ZIP_CONTENT=$(base64 website.zip | tr -d '\n')
+      - aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --comment "Deploy Website" \
+          --parameters '{"commands":["echo '$ZIP_CONTENT' | base64 -d > /tmp/website.zip","sudo yum install -y unzip","sudo rm -rf /usr/share/nginx/html/*","sudo unzip /tmp/website.zip -d /usr/share/nginx/html/","sudo systemctl restart nginx"]}' \
+          --region ap-south-1
 
 artifacts:
   files:
-    - web.zip
+    - website.zip

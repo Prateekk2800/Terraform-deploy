@@ -11,69 +11,36 @@ provider "aws" {
   region = "ap-south-1"
 }
 
-# Security group allowing HTTP and SSH
-resource "aws_security_group" "web_sg" {
-  name        = "web-sg"
-  description = "Allow HTTP and SSH"
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+# Use the existing IAM Role (already imported)
+data "aws_iam_role" "ssm_role" {
+  name = "EC2SSMRole"
 }
 
-# EC2 Instance with SSM role
-resource "aws_instance" "web" {
-  ami           = "ami-0d5d9d301c853a04a" # Amazon Linux 2
-  instance_type = "t3.micro"
-  key_name      = "LinuxKP"
-  security_groups = [aws_security_group.web_sg.name]
+# Use the existing Security Group (already imported)
+data "aws_security_group" "web_sg" {
+  name = "web-sg"
+}
 
-  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+# EC2 Instance
+resource "aws_instance" "web" {
+  ami                    = "ami-083654bd07b5da81d"  # Ubuntu 22.04 LTS
+  instance_type          = "t3.micro"
+  iam_instance_profile   = data.aws_iam_role.ssm_role.name
+  vpc_security_group_ids = [data.aws_security_group.web_sg.id]
+  key_name               = "LinuxKP"
 
   tags = {
     Name = "WebServer"
   }
-}
 
-# IAM Role for SSM
-resource "aws_iam_role" "ssm_role" {
-  name = "EC2SSMRole"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ssm_attach" {
-  role       = aws_iam_role.ssm_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_instance_profile" "ssm_profile" {
-  name = "EC2SSMProfile"
-  role = aws_iam_role.ssm_role.name
+  # Install Apache on launch
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo apt-get update -y
+              sudo apt-get install apache2 -y
+              sudo systemctl enable apache2
+              sudo systemctl start apache2
+              EOF
 }
 
 # Outputs

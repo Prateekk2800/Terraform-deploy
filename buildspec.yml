@@ -6,46 +6,46 @@ phases:
       python: 3.9
     commands:
       - echo "Installing dependencies..."
-      - apt-get update -y
-      - apt-get install -y unzip zip wget
-      - pip install awscli
+      - yum update -y
+      - yum install -y unzip zip wget jq
+      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      - unzip awscliv2.zip
+      - sudo ./aws/install
+      - echo "Installing Terraform..."
       - wget https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip
       - unzip terraform_1.6.0_linux_amd64.zip
       - mv terraform /usr/local/bin/
-      - terraform -version
 
   pre_build:
     commands:
-      - echo "Zipping website folder..."
-      - zip -r website.zip web/*
-
-  build:
-    commands:
-      - echo "Applying Terraform to create EC2..."
+      - echo "Initializing Terraform..."
       - cd Terraform
       - terraform init
       - terraform apply -auto-approve
       - INSTANCE_ID=$(terraform output -raw instance_id)
       - cd ..
 
+  build:
+    commands:
+      - echo "Zipping website folder..."
+      - zip -r website.zip web/*
+
   post_build:
     commands:
       - echo "Deploying website to EC2 via SSM..."
-      - >
-        aws ssm send-command \
-        --instance-ids "$INSTANCE_ID" \
-        --document-name "AWS-RunShellScript" \
-        --comment "Deploy Website" \
-        --parameters commands='[
-          "echo $(base64 website.zip) | base64 -d > /tmp/website.zip",
-          "sudo apt-get update -y",
-          "sudo apt-get install unzip -y",
-          "sudo rm -rf /var/www/html/*",
-          "sudo unzip /tmp/website.zip -d /var/www/html/",
-          "sudo systemctl restart apache2 || sudo systemctl restart nginx"
-        ]' \
-        --region ap-south-1
+      - aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --comment "Deploy Website" \
+          --parameters '{"commands": [
+              "sudo yum install -y nginx",
+              "sudo systemctl enable nginx",
+              "sudo systemctl start nginx",
+              "sudo rm -rf /usr/share/nginx/html/*",
+              "sudo unzip /codebuild/output/src*/website.zip -d /usr/share/nginx/html/"
+          ]}' \
+          --region ap-south-1
 
 artifacts:
   files:
-    - website.zip
+    - '**/*'

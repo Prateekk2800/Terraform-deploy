@@ -11,7 +11,7 @@ provider "aws" {
   region = "ap-south-1"
 }
 
-# SSM IAM Role
+# IAM Role for SSM
 resource "aws_iam_role" "ssm_role" {
   name = "EC2SSMRole"
 
@@ -29,51 +29,66 @@ resource "aws_iam_role" "ssm_role" {
   })
 }
 
+# Attach AmazonSSMManagedInstanceCore
 resource "aws_iam_role_policy_attachment" "ssm_attach" {
   role       = aws_iam_role.ssm_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Security Group
+# Security Group allowing HTTP/SSH
 resource "aws_security_group" "web_sg" {
   name        = "web-sg"
-  description = "Allow HTTP inbound traffic"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  description = "Allow HTTP and SSH"
+  ingress = [
+    {
+      description = "HTTP"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      description = "SSH"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+  egress = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
 }
 
-# Use default VPC
-data "aws_vpc" "default" {
-  default = true
-}
-
-# EC2 instance
+# EC2 Instance
 resource "aws_instance" "web" {
-  ami                         = "ami-0de53d8956e8dcf80" # Amazon Linux 2
-  instance_type               = "t3.micro"
-  key_name                    = "LinuxKP" # replace with your key
-  iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
-  vpc_security_group_ids      = [aws_security_group.web_sg.id]
+  ami           = "ami-0dba2cb6798deb6d8" # Amazon Linux 2
+  instance_type = "t3.micro"
+  key_name      = "LinuxKP"              # your key pair
+  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
 
   tags = {
     Name = "TerraformWebServer"
   }
 }
 
-# Instance Profile
+# IAM Instance Profile for EC2
 resource "aws_iam_instance_profile" "ssm_profile" {
-  name = "EC2SSMProfile"
-  role = aws_iam_role.ssm_rol_
+  name = "EC2SSMInstanceProfile"
+  role = aws_iam_role.ssm_role.name
+}
+
+# Output instance ID and public IP
+output "instance_id" {
+  value = aws_instance.web.id
+}
+
+output "public_ip" {
+  value = aws_instance.web.public_ip
+}

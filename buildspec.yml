@@ -33,17 +33,18 @@ phases:
   post_build:
     commands:
       - echo "Deploying website to EC2 via SSM..."
-      - aws ssm send-command \
+      - |
+        aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --comment "Deploy Website" \
-          --parameters '{"commands": [
-              "sudo yum install -y nginx",
-              "sudo systemctl enable nginx",
-              "sudo systemctl start nginx",
-              "sudo rm -rf /usr/share/nginx/html/*",
-              "sudo unzip /codebuild/output/src*/website.zip -d /usr/share/nginx/html/"
-          ]}' \
+          --parameters 'commands=[
+            "sudo yum install -y nginx",
+            "sudo systemctl enable nginx",
+            "sudo systemctl start nginx",
+            "sudo rm -rf /usr/share/nginx/html/*",
+            "sudo unzip /codebuild/output/src*/website.zip -d /usr/share/nginx/html/"
+          ]' \
           --region ap-south-1
 
 artifacts:

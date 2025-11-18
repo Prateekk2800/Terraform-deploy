@@ -3,35 +3,15 @@ version: 0.2
 phases:
   install:
     commands:
-      - echo "Installing zip"
-      - apt-get update -y || true
-      - apt-get install zip -y || true
+      - echo "Installing zip package"
+      - yum install -y zip
 
   build:
     commands:
-      - echo "Zipping website..."
-      - zip -r website.zip website/
+      - echo "Zipping web folder"
+      - ls -R
+      - zip -r web.zip web/
 
-      - echo "Encoding zip..."
-      - ZIP_BASE64=$(base64 website.zip)
-
-  post_build:
-    commands:
-      - echo "Getting Instance ID from Terraform output"
-      - INSTANCE_ID=$(terraform output -raw instance_id)
-
-      - echo "Deploying website to EC2 via SSM..."
-
-      - aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --comment "Deploy Website" \
-          --parameters "commands=[
-            \"echo $ZIP_BASE64 | base64 -d > /tmp/website.zip\",
-            \"sudo apt update -y\",
-            \"sudo apt install unzip nginx -y\",
-            \"sudo rm -rf /var/www/html/*\",
-            \"sudo unzip /tmp/website.zip -d /var/www/html/\",
-            \"sudo systemctl restart nginx\"
-          ]" \
-          --region ap-south-1
+artifacts:
+  files:
+    - web.zip
